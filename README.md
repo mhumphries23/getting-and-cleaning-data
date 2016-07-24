@@ -1,17 +1,9 @@
 # Getting and Cleaning Data - Mentor assessment project
 
-The data was collected from the accelerometers from the Samsung Galaxy S smartphone. A full description of the data is available at:
-
-http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones
-
-The data can be downloaded from:
-
-https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip
-
 In the run_analysis.R script, functions were created for each step.
 
 Function data :
-This function takes one variables, which happens to be boththe suffix for the filename and the folder name in which the file exists
+This function takes one variable, which happens to be boththe suffix for the filename and the folder name in which the file exists
 as the data exists in both train and test folders with file names as subject_folder, X_folder, y_folder. 
 The y_data file contains Activity_ID. The X_data file contains data for MeasureID and MeasureName.
 The subject_data file contains SubjectID.
