@@ -1,67 +1,84 @@
-# Merge training and test data into one set
-trainData <- read.table("./train/X_train.txt")
-#dim(trainData) # 7352*561
-#head(trainData)
-trainLabel <- read.table("./train/y_train.txt")
-#table(trainLabel)
-trainSubject <- read.table("./train/subject_train.txt")
-testData <- read.table("./test/X_test.txt")
-#dim(testData) # 2947*561
-testLabel <- read.table("./test/y_test.txt") 
-#table(testLabel) 
-testSubject <- read.table("./test/subject_test.txt")
-joinData <- rbind(trainData, testData)
-#dim(joinData) # 10299*561
-joinLabel <- rbind(trainLabel, testLabel)
-#dim(joinLabel) # 10299*1
-joinSubject <- rbind(trainSubject, testSubject)
-#dim(joinSubject) # 10299*1
+# Part 2
+# Read activity ID, subject ID and data column names for each dataset
+# and combine to create tidy data table
 
-# Step2. Create a new table with only mean & sd data
-features <- read.table("./features.txt")
-#dim(features)  # 561*2
-meanStdIndices <- grep("mean\\(\\)|std\\(\\)", features[, 2])
-#length(meanStdIndices) # 66
-joinData <- joinData[, meanStdIndices]
-#dim(joinData) # 10299*66
-names(joinData) <- gsub("\\(\\)", "", features[meanStdIndices, 2]) # remove "()"
-names(joinData) <- gsub("mean", "Mean", names(joinData)) # capitalize M
-names(joinData) <- gsub("std", "Std", names(joinData)) # capitalize S
-names(joinData) <- gsub("-", "", names(joinData)) # remove "-" in column names 
-
-# Step3. Assign activity names to data set
-activity <- read.table("./activity_labels.txt")
-activity[, 2] <- tolower(gsub("_", "", activity[, 2]))
-substr(activity[2, 2], 8, 8) <- toupper(substr(activity[2, 2], 8, 8))
-substr(activity[3, 2], 8, 8) <- toupper(substr(activity[3, 2], 8, 8))
-activityLabel <- activity[joinLabel[, 1], 2]
-joinLabel[, 1] <- activityLabel
-names(joinLabel) <- "activity"
-
-# Step4. Label data set with activity names
-names(joinSubject) <- "subject"
-cleanedData <- cbind(joinSubject, joinLabel, joinData)
-#dim(cleanedData) # 10299*68
-write.table(cleanedData, "merged_data.txt") # write out the 1st dataset
-
-# Step5. Creates a second, independent tidy data set with the average of 
-# each variable for each activity and each subject. 
-subjectLen <- length(table(joinSubject)) # 30
-activityLen <- dim(activity)[1] # 6
-columnLen <- dim(cleanedData)[2]
-result <- matrix(NA, nrow=subjectLen*activityLen, ncol=columnLen) 
-result <- as.data.frame(result)
-colnames(result) <- colnames(cleanedData)
-row <- 1
-for(i in 1:subjectLen) {
-  for(j in 1:activityLen) {
-    result[row, 1] <- sort(unique(joinSubject)[, 1])[i]
-    result[row, 2] <- activity[j, 2]
-    bool1 <- i == cleanedData$subject
-    bool2 <- activity[j, 2] == cleanedData$activity
-    result[row, 3:columnLen] <- colMeans(cleanedData[bool1&bool2, 3:columnLen])
-    row <- row + 1
-  }
+data = function (folder) {
+  ## Activity ID key ##
+  path = file.path(folder, paste0("y_", folder, ".txt"))
+  y_data = read.table(path, header=FALSE, col.names = c("ActiviytID"))
+  ## subject ID ##
+  path = file.path(folder, paste0("subject_", folder, ".txt"))
+  subject_data = read.table(path, header=FALSE, col.names=c("SubjectID"))
+  ## Column key ##
+  data_columns = read.table("features.txt", header=FALSE, as.is=TRUE, col.names=c("MeasureID", "MeasureName"))
+  
+  ## data ##
+  path = file.path(folder, paste0("X_", folder, ".txt"))
+  dataset = read.table(path, header=FALSE, col.names=data_columns$MeasureName)
+  
+  
+  ## Subset to mean and std only ##
+  subset_data_columns = grep(".*mean\\(\\)|.*std\\(\\)", data_columns$MeasureName)
+  
+  dataset = dataset[, subset_data_columns]
+  
+  dataset$ActivityID = y_data$ActivityID
+  dataset$SubjectID = subject_data$SubjectID
+  
+  dataset
 }
-head(result)
-write.table(result, "final_datafile.txt") # write out the 2nd dataset
+
+# read and construct test
+read_test = function() {
+  data("test")
+}
+
+# read and construct train
+read_train = function () {
+  data("train")
+}
+
+# Part 1: merge datasets and give proper column names
+mergeDataset = function () {
+  dataset = rbind(read_test(), read_train())
+  cnames = colnames(dataset)
+  cnames = gsub("\\.+mean\\.+", cnames, replacement = "Mean")
+  cnames = gsub("\\.+std\\.+", cnames, replacement = "Std")
+  colnames(dataset) = cnames
+  dataset
+}
+
+# Part 3 & Part 4
+# Assign appropriate activity labels to each row of data
+activityLabels = function (dataset) {
+  activity_labels = read.table("activity_labels.txt", header = FALSE, as.is=TRUE, col.names = c("ActivityID", "ActivityName"))
+  activity_labels$ActivityName = as.factor(activity_labels$ActivityName)
+  data_labels = merge(dataset, activity_labels)
+  data_labels
+}
+
+# merging the activity labels to the merged dataset
+merge_label_data = function () {
+  activityLabels(mergeDataset())
+}
+
+# Part 5
+# Creating a second, independent tidy data set with the average of each variable for each activity and each subject. 
+tidyData = function(merge_label_data) {
+  library(reshape2)
+  
+  vars = c("ActivityID", "ActivityName", "SubjectID")
+  measure_vars = setdiff(colnames(merge_label_data), vars)
+  melted_data <- melt(merge_label_data, id=vars, measure.vars=measure_vars)
+  
+  # recast 
+  dcast(melted_data, ActivityName + SubjectID ~ variable, mean)
+}
+
+#Getting the clean tidy dataset
+final_datafile =function(folder){
+  tidy_data = tidyData(merge_label_data())
+  write.table(tidy_data, folder)
+}
+
+final_datafile("final_output.txt")
